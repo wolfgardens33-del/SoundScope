@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SoundScope</title>
+  <link rel="manifest" href="manifest.json" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+
+  <header id="app-header">
+    <h1>SoundScope</h1>
+    <button id="init-engine-btn">Initialize Audio Engine</button>
+    <div id="mode-toggle">
+      <button id="mode-analysis" class="mode-btn active">Analysis</button>
+      <button id="mode-production" class="mode-btn">Production</button>
+    </div>
+  </header>
+
+  <main id="app-main">
+
+    <!-- 64-band spectrum analyzer, arranged above the mixer per v1.4 spec -->
+    <section id="spectrum-analyzer-panel">
+      <canvas id="spectrum-canvas" width="1280" height="200"></canvas>
+    </section>
+
+    <!-- 24-channel mixer, arranged below the analyzer -->
+    <section id="mixer-panel">
+      <div id="mixer-channels"><!-- 24 channel strips, UI not built yet --></div>
+    </section>
+
+    <!-- 32-band graphic EQ - separate component from the analyzer, not built yet -->
+    <section id="eq-panel">
+      <div id="eq-bands"></div>
+    </section>
+
+    <!-- Input device selector -->
+    <section id="device-panel">
+      <label for="input-device-select">Input Device:</label>
+      <select id="input-device-select">
+        <option>Click "Initialize Audio Engine" first</option>
+      </select>
+    </section>
+
+  </main>
+
+  <footer id="app-footer">
+    <span id="engine-status">NightstarAudioEngine: not initialized</span>
+  </footer>
+
+  <!--
+    type="module" is required: audio-engine.js, mixer.js, spectrum-analyzer.js,
+    and vu-meter.js all use ES module import/export syntax. main.js pulls
+    them together - it's the only script that needs to be loaded directly,
+    since it imports the rest itself.
+  -->
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>
