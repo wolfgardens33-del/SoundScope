@@ -1,0 +1,207 @@
+:root {
+  --bg: #0a0a0a;
+  --panel: #161616;
+  --border: #2a2a2a;
+  --text: #e0e0e0;
+  --accent: #3fa9f5;
+  --accent-dim: #1c5a82;
+  --danger: #e5484d;
+  --meter-green: #3fd67a;
+  --meter-yellow: #e8c547;
+  --meter-red: #e5484d;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: system-ui, -apple-system, sans-serif;
+  margin: 0;
+  padding: 0;
+}
+
+#app-header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 12px 20px;
+  background: var(--panel);
+  border-bottom: 1px solid var(--border);
+}
+
+#app-header h1 { font-size: 1.2rem; margin: 0; margin-right: auto; }
+
+button {
+  background: var(--accent-dim);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 6px 12px;
+  cursor: pointer;
+  font-size: 0.85rem;
+}
+button:hover { background: var(--accent); }
+button.active { background: var(--accent); font-weight: bold; }
+
+#mode-toggle { display: flex; gap: 4px; }
+.mode-btn.active { background: var(--accent); }
+
+#app-main { padding: 16px 20px; }
+
+section { margin-bottom: 20px; }
+
+#spectrum-analyzer-panel {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 8px;
+}
+#spectrum-canvas { width: 100%; height: 200px; display: block; }
+
+#mixer-panel {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 12px;
+}
+
+#add-channel-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+#add-channel-controls select {
+  background: var(--bg);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 5px 8px;
+}
+#channel-count-label { color: #888; font-size: 0.8rem; }
+
+#mixer-channels {
+  display: flex;
+  gap: 10px;
+  overflow-x: auto;
+  padding-bottom: 8px;
+}
+
+.channel-strip {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 10px;
+  min-width: 110px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.strip-header {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.strip-id { font-size: 0.75rem; color: #888; }
+.strip-type {
+  font-size: 0.65rem;
+  padding: 1px 5px;
+  border-radius: 3px;
+  background: var(--accent-dim);
+  margin-right: auto;
+}
+.strip-remove {
+  background: transparent;
+  border: none;
+  color: #888;
+  font-size: 1rem;
+  padding: 0 4px;
+  line-height: 1;
+}
+.strip-remove:hover { color: var(--danger); background: transparent; }
+
+.strip-meters {
+  display: flex;
+  gap: 6px;
+  height: 80px;
+}
+.vu-meter {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  flex: 1;
+}
+.vu-meter-label { font-size: 0.6rem; color: #888; }
+.vu-meter-track {
+  width: 14px;
+  flex: 1;
+  background: #000;
+  border: 1px solid var(--border);
+  border-radius: 2px;
+  display: flex;
+  align-items: flex-end;
+  overflow: hidden;
+}
+.vu-meter-fill {
+  width: 100%;
+  height: 0%;
+  background: linear-gradient(to top, var(--meter-green) 0%, var(--meter-green) 70%, var(--meter-yellow) 85%, var(--meter-red) 100%);
+  transition: height 0.05s linear;
+}
+.vu-meter-fill.clipping { background: var(--meter-red); }
+
+.strip-slider-row {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 0.7rem;
+  color: #888;
+}
+.strip-slider-row input[type="range"] { width: 100%; }
+
+.strip-fader-row {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.7rem;
+  color: #888;
+}
+.fader-vertical {
+  writing-mode: vertical-lr;
+  direction: rtl;
+  width: 24px;
+  height: 90px;
+}
+
+.strip-mute {
+  font-size: 0.75rem;
+  padding: 4px;
+}
+.strip-mute.active { background: var(--danger); }
+
+#device-panel, #eq-panel {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 12px;
+}
+#device-panel label { margin-right: 8px; }
+#input-device-select {
+  background: var(--bg);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 5px 8px;
+}
+
+#app-footer {
+  padding: 10px 20px;
+  border-top: 1px solid var(--border);
+  color: #888;
+  font-size: 0.8rem;
+}
