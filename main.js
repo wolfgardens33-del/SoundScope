@@ -1,98 +1,155 @@
 /**
  * main.js
  * -------
- * Wires the whole SoundScope v1.4 shell together. AudioContext creation
- * must happen from a user gesture, so nothing audio-related fires until
- * the user interacts with the page (per browser autoplay policy).
+ * Wires the index.html shell to the actual NightstarAudioEngine.
  *
- * Analysis vs Production mode: behavior difference was an open item in
- * the spec. Implemented here with a reasonable default — Analysis mode
- * shows the 64-band analyzer prominently and hides the EQ (since you're
- * listening/comparing, not shaping); Production mode hides the analyzer
- * panel to save CPU and surfaces the EQ for active mixing. Change the
- * toggleMode() logic below if that's not the right split.
+ * IMPORTANT: browsers block AudioContext + getUserMedia until a real user
+ * gesture (a click) happens. That's why nothing can auto-initialize on
+ * page load - the "Initialize Audio Engine" button below is required.
  */
 
-(function () {
-  let engineStarted = false;
+import { NightstarAudioEngine } from './audio-engine.js';
 
-  function setStatus(text) {
-    const statusEl = document.getElementById("engine-status");
-    if (statusEl) statusEl.textContent = text;
-  }
+let engine = null;
+let drawLoopHandle = null;
+let currentAnalysisChannelId = null;
 
-  async function startEngine() {
-    if (engineStarted) return;
+const statusEl = document.getElementById('engine-status');
+const initBtn = document.getElementById('init-engine-btn');
+const modeAnalysisBtn = document.getElementById('mode-analysis');
+const modeProductionBtn = document.getElementById('mode-production');
+const deviceSelect = document.getElementById('input-device-select');
+const canvas = document.getElementById('spectrum-canvas');
+const ctx = canvas.getContext('2d');
 
-    window.nightstarEngine.init();
-    setStatus("NightstarAudioEngine: running");
+function setStatus(text) {
+  statusEl.textContent = `NightstarAudioEngine: ${text}`;
+}
 
-    spectrumAnalyzer.init();
-    spectrumAnalyzer.start();
+async function initEngine() {
+  if (engine) return; // already initialized
 
-    await deviceSelector.init((stream) => {
-      // Selected input device changed — wrap it as a source node and
-      // feed it into channel 0 as an example. Real wiring of all 24
-      // channels to real hardware inputs depends on how many physical
-      // inputs are actually available; placeholder oscillators fill
-      // the rest during UI testing.
-      const source = window.nightstarEngine.context.createMediaStreamSource(stream);
-      if (window.nightstarEngine.channels[0]) {
-        source.connect(window.nightstarEngine.channels[0].fader);
-      }
-    });
+  initBtn.disabled = true;
+  setStatus('initializing...');
 
-    // Placeholder source nodes for the 24-channel mixer until real
-    // hardware inputs are wired per-channel. Silent gain nodes so the
-    // mixer UI and meters are testable without live audio.
-    const placeholderSources = [];
-    for (let i = 0; i < mixer.CHANNEL_COUNT; i++) {
-      const silentGain = window.nightstarEngine.context.createGain();
-      silentGain.gain.value = 0;
-      placeholderSources.push(silentGain);
+  try {
+    engine = new NightstarAudioEngine();
+
+    // Resume in case the browser created the AudioContext in a suspended state.
+    if (engine.audioContext.state === 'suspended') {
+      await engine.audioContext.resume();
     }
-    mixer.initChannels(placeholderSources);
 
-    // EQ inserted between master gain and destination as an example
-    // insertion point — adjust if EQ should sit per-channel instead of
-    // on the master bus.
-    eq.init(window.nightstarEngine.masterGain, window.nightstarEngine.context.destination);
+    // Create one channel to start with, so the device dropdown + analysis
+    // mode have something to route into.
+    const firstChannel = engine.mixer.addChannel('mic');
+    currentAnalysisChannelId = firstChannel.id;
 
-    engineStarted = true;
+    await populateDeviceList();
+
+    setStatus(`running (${engine.mode} mode)`);
+    initBtn.textContent = 'Engine Running';
+    startDrawLoop();
+  } catch (err) {
+    console.error('Engine init failed:', err);
+    setStatus(`init failed - ${err.message}`);
+    initBtn.disabled = false;
+  }
+}
+
+async function populateDeviceList() {
+  deviceSelect.innerHTML = '';
+
+  // Requesting a throwaway mic stream first is what makes device labels
+  // available at all (browsers hide labels until permission is granted).
+  try {
+    const tempStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    tempStream.getTracks().forEach((t) => t.stop());
+  } catch (err) {
+    const opt = document.createElement('option');
+    opt.textContent = 'Microphone permission denied';
+    deviceSelect.appendChild(opt);
+    return;
   }
 
-  function toggleMode(mode) {
-    const analysisBtn = document.getElementById("mode-analysis");
-    const productionBtn = document.getElementById("mode-production");
-    const analyzerPanel = document.getElementById("spectrum-analyzer-panel");
-    const eqPanel = document.getElementById("eq-panel");
+  const devices = await engine.listInputDevices();
 
-    if (mode === "analysis") {
-      analysisBtn.classList.add("active");
-      productionBtn.classList.remove("active");
-      analyzerPanel.style.display = "block";
-      eqPanel.style.display = "none";
-    } else {
-      analysisBtn.classList.remove("active");
-      productionBtn.classList.add("active");
-      analyzerPanel.style.display = "none";
-      eqPanel.style.display = "block";
+  if (devices.length === 0) {
+    const opt = document.createElement('option');
+    opt.textContent = 'No input devices found';
+    deviceSelect.appendChild(opt);
+    return;
+  }
+
+  for (const device of devices) {
+    const opt = document.createElement('option');
+    opt.value = device.deviceId;
+    opt.textContent = device.label || `Input ${deviceSelect.length + 1}`;
+    deviceSelect.appendChild(opt);
+  }
+}
+
+async function onDeviceSelected() {
+  if (!engine || !currentAnalysisChannelId) return;
+  const deviceId = deviceSelect.value;
+  if (!deviceId) return;
+
+  try {
+    await engine.connectInputDevice(deviceId, currentAnalysisChannelId);
+    setStatus(`running - input connected (${engine.mode} mode)`);
+  } catch (err) {
+    console.error('Failed to connect input device:', err);
+    setStatus(`input connect failed - ${err.message}`);
+  }
+}
+
+function setMode(mode) {
+  if (!engine) return;
+
+  if (mode === 'analysis') {
+    engine.setMode('analysis', currentAnalysisChannelId);
+    modeAnalysisBtn.classList.add('active');
+    modeProductionBtn.classList.remove('active');
+  } else {
+    engine.setMode('production');
+    modeProductionBtn.classList.add('active');
+    modeAnalysisBtn.classList.remove('active');
+  }
+
+  setStatus(`running (${engine.mode} mode)`);
+}
+
+function startDrawLoop() {
+  const width = canvas.width;
+  const height = canvas.height;
+  const barWidth = width / engine.analyzer.bandCount;
+
+  function draw() {
+    const bands = engine.analyzer.getBands(); // Float32Array(64), 0-255 scale
+
+    ctx.clearRect(0, 0, width, height);
+    ctx.fillStyle = '#0a0a0a';
+    ctx.fillRect(0, 0, width, height);
+
+    for (let i = 0; i < bands.length; i++) {
+      const magnitude = bands[i] / 255; // normalize 0-1
+      const barHeight = magnitude * height;
+      const x = i * barWidth;
+      const y = height - barHeight;
+
+      ctx.fillStyle = `hsl(${200 - magnitude * 160}, 80%, 55%)`;
+      ctx.fillRect(x, y, barWidth - 1, barHeight);
     }
+
+    drawLoopHandle = requestAnimationFrame(draw);
   }
 
-  document.addEventListener("DOMContentLoaded", () => {
-    document.getElementById("mode-analysis").addEventListener("click", () => toggleMode("analysis"));
-    document.getElementById("mode-production").addEventListener("click", () => toggleMode("production"));
+  draw();
+}
 
-    // Engine starts on first user interaction anywhere in the app,
-    // satisfying the browser's autoplay-gesture requirement without
-    // forcing a dedicated "Start" button if you don't want one.
-    document.body.addEventListener(
-      "click",
-      () => {
-        startEngine();
-      },
-      { once: true }
-    );
-  });
-})();
+// ---------- Event wiring ----------
+
+initBtn.addEventListener('click', initEngine);
+modeAnalysisBtn.addEventListener('click', () => setMode('analysis'));
+modeProductionBtn.addEventListener('click', () => setMode('production'));
+deviceSelect.addEventListener('change', onDeviceSelected);
